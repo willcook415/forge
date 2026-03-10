@@ -1,0 +1,90 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Forge",
+  "scopeName": "source.forge",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#units"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#parentheses"
+    },
+    {
+      "include": "#identifiers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.forge",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.forge",
+          "match": "\\b(?:print|as)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.forge",
+          "match": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b"
+        }
+      ]
+    },
+    "units": {
+      "patterns": [
+        {
+          "name": "support.type.unit.forge",
+          "match": "\\b(?:m|mm|s|kg|N|kN|Pa|kPa|MPa)\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arithmetic.forge",
+          "match": "[+\\-*/^=]"
+        }
+      ]
+    },
+    "parentheses": {
+      "patterns": [
+        {
+          "name": "punctuation.section.group.begin.forge",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.section.group.end.forge",
+          "match": "\\)"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.readwrite.forge",
+          "match": "\\b[A-Za-z][A-Za-z0-9]*\\b"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "forge-syntax",
+  "displayName": "Forge Syntax Highlighting",
+  "description": "Syntax highlighting support for Forge (.forge) files.",
+  "version": "0.1.0",
+  "publisher": "forge-lang",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "forge",
+        "aliases": [
+          "Forge",
+          "forge"
+        ],
+        "extensions": [
+          ".forge"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "forge",
+        "scopeName": "source.forge",
+        "path": "./syntaxes/forge.tmLanguage.json"
+      }
+    ]
+  }
+}

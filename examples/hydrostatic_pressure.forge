@@ -1,0 +1,6 @@
+# Hydrostatic pressure at depth in water.
+rho = 1000 kg/m^3
+g = 9.81 m/s^2
+h = 2.5 m
+p = rho * g * h
+print p as kPa

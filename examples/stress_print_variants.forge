@@ -1,0 +1,5 @@
+force = 12 kN
+area = 300 mm^2
+stress = force / area
+print stress
+print stress as MPa

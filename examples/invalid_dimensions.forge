@@ -1,0 +1,4 @@
+# Invalid addition across incompatible dimensions.
+length = 5 m
+time = 2 s
+bad = length + time

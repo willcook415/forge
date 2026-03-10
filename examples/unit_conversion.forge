@@ -1,0 +1,3 @@
+# Convert millimeters to meters.
+length = 2500 mm
+print length as m

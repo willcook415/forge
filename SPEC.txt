@@ -1,0 +1,81 @@
+Forge v0.1 Specification
+
+Overview Forge is a domain-specific interpreted programming language for
+engineering calculations. Its core purpose is to make calculations
+involving physical quantities safer and easier to read by providing: -
+native unit-aware quantities - dimensional analysis - explicit unit
+conversions - clear error messages for invalid operations
+
+Forge is not a general-purpose language. It is intentionally narrow and
+focused.
+
+Design goals - Make engineering calculations readable and close to
+worked solutions - Prevent invalid dimensional operations by default -
+Keep syntax small, simple, and teachable - Keep the implementation
+modular and extensible - Prioritise correctness and clarity over feature
+count
+
+Non-goals for v0.1 - loops - conditionals - user-defined functions -
+modules/imports - classes/objects - collections - file I/O - plotting -
+equation solving - symbolic algebra - native code generation
+
+Execution model Forge v0.1 is an interpreted language. A source file is
+read, tokenised, parsed into an AST, semantically validated, and then
+interpreted.
+
+Source files Forge source files should use the .forge extension.
+
+Comments A comment starts with # and continues to the end of the line.
+
+Statements Assignment: name = expression
+
+Example: force = 12 kN area = 300 mm^2 stress = force / area
+
+Print: print expression print expression as UNIT
+
+Examples: print stress print stress as MPa
+
+Expressions Supported expressions: - numeric literals - quantity
+literals using units - variable references - parentheses - unary minus -
+binary operators: + - * / ^
+
+Numeric literals Supported forms: - integers (12) - decimals (12.5) -
+scientific notation (80e3)
+
+Units supported in v0.1 Base: m, mm, s, kg
+
+Derived: N, kN, Pa, kPa, MPa
+
+Unit definitions m -> scale 1, dimension L mm -> scale 0.001, dimension
+L s -> scale 1, dimension T kg -> scale 1, dimension M N -> scale 1,
+dimension M L T^-2 kN -> scale 1000, dimension M L T^-2 Pa -> scale 1,
+dimension M L^-1 T^-2 kPa -> scale 1000, dimension M L^-1 T^-2 MPa ->
+scale 1000000, dimension M L^-1 T^-2
+
+Base dimensions tracked Length (L) Mass (M) Time (T)
+
+Operator semantics
+
+Addition/Subtraction Operands must have identical dimensions.
+
+Multiplication/Division Dimensions combine algebraically.
+
+Exponentiation Exponent must be dimensionless. Integer exponents are
+sufficient for v0.1.
+
+Unit conversion Conversion using “as” is supported only in print
+statements in v0.1.
+
+Example: print stress as MPa
+
+Name resolution Variables must be defined before use. Variable names are
+case-sensitive.
+
+Error handling Forge should produce readable errors with line and column
+information when possible.
+
+Example error: Cannot add incompatible quantities at line 4 column 12.
+Left dimension: [L] Right dimension: [T]
+
+Example program # Axial stress force = 12 kN area = 300 mm^2 stress =
+force / area print stress as MPa
