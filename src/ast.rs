@@ -1,4 +1,6 @@
-//! Abstract syntax tree definitions for Forge v0.1.
+//! Abstract syntax tree definitions for Forge.
+
+use std::fmt;
 
 /// Top-level program node.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -80,4 +82,44 @@ pub enum UnitExpr {
     Divide(Box<UnitExpr>, Box<UnitExpr>),
     /// Integer unit power (`mm^2`).
     Power { base: String, exponent: u32 },
+}
+
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Expr::Number(value) => write!(f, "{value}"),
+            Expr::Quantity { value, unit } => write!(f, "{value} {unit}"),
+            Expr::Variable(name) => write!(f, "{name}"),
+            Expr::Group(inner) => write!(f, "({inner})"),
+            Expr::Unary {
+                op: UnaryOp::Negate,
+                expression,
+            } => write!(f, "-{expression}"),
+            Expr::Binary { left, op, right } => write!(f, "{left} {op} {right}"),
+        }
+    }
+}
+
+impl fmt::Display for BinaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let symbol = match self {
+            BinaryOp::Add => "+",
+            BinaryOp::Subtract => "-",
+            BinaryOp::Multiply => "*",
+            BinaryOp::Divide => "/",
+            BinaryOp::Power => "^",
+        };
+        write!(f, "{symbol}")
+    }
+}
+
+impl fmt::Display for UnitExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnitExpr::Unit(symbol) => write!(f, "{symbol}"),
+            UnitExpr::Multiply(left, right) => write!(f, "{left}*{right}"),
+            UnitExpr::Divide(left, right) => write!(f, "{left}/{right}"),
+            UnitExpr::Power { base, exponent } => write!(f, "{base}^{exponent}"),
+        }
+    }
 }

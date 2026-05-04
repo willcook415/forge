@@ -1,0 +1,7 @@
+# Thin-wall hoop stress estimate.
+pressure = 9 bar
+diameter = 1.2 m
+radius = diameter / 2
+thickness = 12 mm
+hoopstress = pressure * radius / thickness
+print hoopstress as MPa

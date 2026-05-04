@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Format and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Run tests
+        run: cargo test
+
+  release-artifacts:
+    name: Build release artifact (${{ matrix.name }})
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x86_64
+            os: windows-latest
+            binary: target/release/forge.exe
+            artifact_file: forge-windows-x86_64.exe
+          - name: linux-x86_64
+            os: ubuntu-latest
+            binary: target/release/forge
+            artifact_file: forge-linux-x86_64
+          - name: macos-arm64
+            os: macos-latest
+            binary: target/release/forge
+            artifact_file: forge-macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Prepare artifact
+        shell: pwsh
+        run: Copy-Item "${{ matrix.binary }}" "${{ matrix.artifact_file }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-${{ matrix.name }}
+          path: ${{ matrix.artifact_file }}
+          if-no-files-found: error

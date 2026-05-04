@@ -16,19 +16,30 @@ use error::{ForgeError, ForgeResult};
 use interpreter::Interpreter;
 use lexer::Lexer;
 use parser::Parser;
-use semantic::SemanticAnalyzer;
+use semantic::{AnalysisReport, SemanticAnalyzer};
+use units::UnitRegistry;
 
-fn parse_and_validate_source(source: &str) -> ForgeResult<Program> {
+const DESCRIPTION: &str =
+    "Forge is a unit-safe engineering worksheet language with dimensional analysis.";
+
+fn parse_source(source: &str) -> ForgeResult<Program> {
     let mut lexer = Lexer::new(source);
     let tokens = lexer.tokenize()?;
 
     let mut parser = Parser::new(tokens);
-    let program = parser.parse()?;
+    parser.parse()
+}
 
+fn parse_and_analyze_source(source: &str) -> ForgeResult<(Program, AnalysisReport)> {
+    let program = parse_source(source)?;
     let analyzer = SemanticAnalyzer::new();
-    analyzer.validate(&program)?;
+    let report = analyzer.analyze(&program)?;
 
-    Ok(program)
+    Ok((program, report))
+}
+
+fn parse_and_validate_source(source: &str) -> ForgeResult<Program> {
+    parse_and_analyze_source(source).map(|(program, _)| program)
 }
 
 fn run_source(source: &str) -> ForgeResult<Vec<String>> {
@@ -39,33 +50,126 @@ fn run_source(source: &str) -> ForgeResult<Vec<String>> {
 }
 
 fn check_source(source: &str) -> ForgeResult<()> {
-    let _ = parse_and_validate_source(source)?;
+    let program = parse_source(source)?;
+    let analyzer = SemanticAnalyzer::new();
+    analyzer.validate(&program)?;
     Ok(())
 }
 
-fn run_file(path: &Path) -> ForgeResult<Vec<String>> {
-    let source = std::fs::read_to_string(path).map_err(|error| {
+fn read_script(path: &Path) -> ForgeResult<String> {
+    std::fs::read_to_string(path).map_err(|error| {
         ForgeError::new(format!(
             "Failed to read script '{}': {error}",
             path.display()
         ))
-    })?;
+    })
+}
+
+fn run_file(path: &Path) -> ForgeResult<Vec<String>> {
+    let source = read_script(path)?;
     run_source(&source)
 }
 
 fn check_file(path: &Path) -> ForgeResult<()> {
-    let source = std::fs::read_to_string(path).map_err(|error| {
-        ForgeError::new(format!(
-            "Failed to read script '{}': {error}",
-            path.display()
-        ))
-    })?;
+    let source = read_script(path)?;
     check_source(&source)
+}
+
+fn explain_file(path: &Path) -> ForgeResult<String> {
+    let source = read_script(path)?;
+    let (_, report) = parse_and_analyze_source(&source)?;
+    Ok(format_analysis_report(&report))
 }
 
 fn usage(program: &str) -> String {
     format!(
-        "Usage:\n  {program} run <file>\n  {program} check <file>\n  {program} version"
+        "{DESCRIPTION}\n\nUsage:\n  {program} <command> [args]\n\nCommands:\n  run <file>       Validate and execute a Forge script\n  check <file>     Validate a script without executing it\n  explain <file>   Show inferred dimensions and output conversions\n  units            List supported built-in units\n  examples         List included example scripts and demo commands\n  version          Print the Forge version\n  help             Show this help text\n\nExamples:\n  {program} version\n  {program} units\n  {program} explain examples/axial_stress.forge\n  {program} run examples/beam_bending.forge\n  {program} check examples/dimension_error.forge"
+    )
+}
+
+fn command_usage(program: &str, command: &str) -> String {
+    format!("{}\n\n{}", command_error_hint(command), usage(program))
+}
+
+fn command_error_hint(command: &str) -> String {
+    match command {
+        "run" => "Usage for run:\n  forge run <file>",
+        "check" => "Usage for check:\n  forge check <file>",
+        "explain" => "Usage for explain:\n  forge explain <file>",
+        "units" => "Usage for units:\n  forge units",
+        "examples" => "Usage for examples:\n  forge examples",
+        "version" => "Usage for version:\n  forge version",
+        "help" => "Usage for help:\n  forge help",
+        _ => "Run `forge help` for usage.",
+    }
+    .to_string()
+}
+
+fn format_units_listing() -> String {
+    let mut rendered = String::from("Supported built-in units:\n");
+
+    for category in UnitRegistry::categories() {
+        rendered.push_str(&format!("\n{}:\n", category.title()));
+        for unit in UnitRegistry::units_in_category(*category) {
+            rendered.push_str(&format!("  {:<6} {}\n", unit.symbol, unit.dimension));
+        }
+    }
+
+    rendered.trim_end().to_string()
+}
+
+fn format_analysis_report(report: &AnalysisReport) -> String {
+    let mut rendered = String::from("Inferred dimensions:\n");
+
+    if report.variables.is_empty() {
+        rendered.push_str("  (none)\n");
+    } else {
+        let width = report
+            .variables
+            .iter()
+            .map(|variable| variable.name.len())
+            .max()
+            .unwrap_or(0);
+        for variable in &report.variables {
+            rendered.push_str(&format!(
+                "  {:width$}  {}\n",
+                variable.name,
+                variable.dimension,
+                width = width
+            ));
+        }
+    }
+
+    rendered.push_str("\nOutputs:\n");
+    if report.outputs.is_empty() {
+        rendered.push_str("  (none)");
+    } else {
+        for output in &report.outputs {
+            let status = if output.compatible {
+                "compatible"
+            } else {
+                "incompatible"
+            };
+            match &output.as_unit {
+                Some(unit) => rendered.push_str(&format!(
+                    "  print {} as {}  {} ({})\n",
+                    output.expression, unit, status, output.dimension
+                )),
+                None => rendered.push_str(&format!(
+                    "  print {}  {} ({})\n",
+                    output.expression, status, output.dimension
+                )),
+            }
+        }
+        rendered = rendered.trim_end().to_string();
+    }
+
+    rendered
+}
+
+fn format_examples_listing(program: &str) -> String {
+    format!(
+        "Included examples:\n  axial_stress.forge       axial stress from force and area\n  beam_bending.forge       bending stress from moment and section inertia\n  pressure_vessel.forge    thin-wall hoop stress estimate\n  power_torque.forge       torque and rotational rate converted to power\n  reynolds_number.forge    dimensionless Reynolds number\n  dimension_error.forge    intentional unit mistake for diagnostics\n\nSuggested commands:\n  {program} explain examples/axial_stress.forge\n  {program} run examples/pressure_vessel.forge\n  {program} run examples/power_torque.forge\n  {program} check examples/dimension_error.forge"
     )
 }
 
@@ -102,7 +206,8 @@ fn format_cli_error(path: &Path, error: &ForgeError) -> String {
 
 fn main() {
     let mut args = std::env::args();
-    let program = args.next().unwrap_or_else(|| "forge".to_string());
+    let _invoked = args.next();
+    let program = "forge".to_string();
 
     let Some(command) = args.next() else {
         eprintln!("{}", usage(&program));
@@ -112,7 +217,10 @@ fn main() {
     match command.as_str() {
         "help" | "-h" | "--help" => {
             if args.next().is_some() {
-                eprintln!("The 'help' command does not take arguments.\n\n{}", usage(&program));
+                eprintln!(
+                    "The 'help' command does not take arguments.\n\n{}",
+                    command_usage(&program, "help")
+                );
                 std::process::exit(2);
             }
             println!("{}", usage(&program));
@@ -121,13 +229,16 @@ fn main() {
             let Some(path) = args.next() else {
                 eprintln!(
                     "Missing file path for 'run' command.\n\n{}",
-                    usage(&program)
+                    command_usage(&program, "run")
                 );
                 std::process::exit(2);
             };
 
             if args.next().is_some() {
-                eprintln!("Too many arguments for 'run' command.\n\n{}", usage(&program));
+                eprintln!(
+                    "Too many arguments for 'run' command.\n\n{}",
+                    command_usage(&program, "run")
+                );
                 std::process::exit(2);
             }
 
@@ -147,13 +258,16 @@ fn main() {
             let Some(path) = args.next() else {
                 eprintln!(
                     "Missing file path for 'check' command.\n\n{}",
-                    usage(&program)
+                    command_usage(&program, "check")
                 );
                 std::process::exit(2);
             };
 
             if args.next().is_some() {
-                eprintln!("Too many arguments for 'check' command.\n\n{}", usage(&program));
+                eprintln!(
+                    "Too many arguments for 'check' command.\n\n{}",
+                    command_usage(&program, "check")
+                );
                 std::process::exit(2);
             }
 
@@ -167,9 +281,57 @@ fn main() {
                 }
             }
         }
+        "explain" => {
+            let Some(path) = args.next() else {
+                eprintln!(
+                    "Missing file path for 'explain' command.\n\n{}",
+                    command_usage(&program, "explain")
+                );
+                std::process::exit(2);
+            };
+
+            if args.next().is_some() {
+                eprintln!(
+                    "Too many arguments for 'explain' command.\n\n{}",
+                    command_usage(&program, "explain")
+                );
+                std::process::exit(2);
+            }
+
+            match explain_file(Path::new(&path)) {
+                Ok(report) => println!("{report}"),
+                Err(error) => {
+                    eprintln!("{}", format_cli_error(Path::new(&path), &error));
+                    std::process::exit(1);
+                }
+            }
+        }
+        "units" => {
+            if args.next().is_some() {
+                eprintln!(
+                    "The 'units' command does not take arguments.\n\n{}",
+                    command_usage(&program, "units")
+                );
+                std::process::exit(2);
+            }
+            println!("{}", format_units_listing());
+        }
+        "examples" => {
+            if args.next().is_some() {
+                eprintln!(
+                    "The 'examples' command does not take arguments.\n\n{}",
+                    command_usage(&program, "examples")
+                );
+                std::process::exit(2);
+            }
+            println!("{}", format_examples_listing(&program));
+        }
         "version" => {
             if args.next().is_some() {
-                eprintln!("The 'version' command does not take arguments.\n\n{}", usage(&program));
+                eprintln!(
+                    "The 'version' command does not take arguments.\n\n{}",
+                    command_usage(&program, "version")
+                );
                 std::process::exit(2);
             }
             println!("forge {}", env!("CARGO_PKG_VERSION"));

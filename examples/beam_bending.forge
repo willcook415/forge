@@ -1,0 +1,6 @@
+# Elastic bending stress for a rectangular beam section.
+moment = 18 kN*m
+c = 75 mm
+inertia = 42e6 mm^4
+stress = moment * c / inertia
+print stress as MPa

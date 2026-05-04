@@ -69,10 +69,7 @@ fn runs_kinetic_energy_example() {
         "stderr: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(
-        String::from_utf8_lossy(&output.stdout).trim(),
-        "240000 [L^2 M T^-2]"
-    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "240 kJ");
 }
 
 #[test]
@@ -98,6 +95,26 @@ fn runs_stress_print_variants_example() {
         String::from_utf8_lossy(&output.stdout).trim(),
         "40000000 [L^-1 M T^-2]\n40 MPa"
     );
+}
+
+#[test]
+fn runs_new_engineering_examples() {
+    let cases = [
+        ("beam_bending.forge", "32.1429 MPa"),
+        ("pressure_vessel.forge", "45 MPa"),
+        ("power_torque.forge", "2400 N*m\n72 kW"),
+        ("reynolds_number.forge", "59880"),
+    ];
+
+    for (script, expected) in cases {
+        let output = run_script(script);
+        assert!(
+            output.status.success(),
+            "{script} stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), expected);
+    }
 }
 
 #[test]
@@ -152,23 +169,94 @@ fn check_reports_syntax_error_with_file_line_and_column() {
 
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("error: Invalid syntax: expected '=' after variable name in assignment."));
+    assert!(
+        stderr.contains("error: Invalid syntax: expected '=' after variable name in assignment.")
+    );
     assert!(stderr.contains("Found number '12'."));
     assert!(stderr.contains(&format!("{}:1:7", script.display())));
 }
 
 #[test]
 fn check_reports_unknown_unit_with_file_line_and_column() {
-    let script = write_temp_script("unknown_unit", "length = 10 cm\n");
+    let script = write_temp_script("unknown_unit", "length = 10 inch\n");
     let script_arg = script.to_string_lossy().into_owned();
     let output = run_cli(&["check", &script_arg]);
     let _ = fs::remove_file(&script);
 
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("error: Unknown unit 'cm'."));
-    assert!(stderr.contains("Supported units are: m, mm, s, kg, N, kN, Pa, kPa, MPa."));
+    assert!(stderr.contains("error: Unknown unit 'inch'."));
+    assert!(stderr.contains("Supported units are:"));
+    assert!(stderr.contains("cm"));
+    assert!(stderr.contains("kW"));
     assert!(stderr.contains(&format!("{}:1:1", script.display())));
+}
+
+#[test]
+fn units_command_lists_grouped_registry() {
+    let output = run_cli(&["units"]);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Supported built-in units:"));
+    assert!(stdout.contains("Length:"));
+    assert!(stdout.contains("  cm"));
+    assert!(stdout.contains("Pressure / Stress:"));
+    assert!(stdout.contains("  GPa"));
+    assert!(stdout.contains("Power:"));
+    assert!(stdout.contains("  kW"));
+}
+
+#[test]
+fn examples_command_lists_demo_scripts() {
+    let output = run_cli(&["examples"]);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Included examples:"));
+    assert!(stdout.contains("axial_stress.forge"));
+    assert!(stdout.contains("pressure_vessel.forge"));
+    assert!(stdout.contains("Suggested commands:"));
+    assert!(stdout.contains("forge run examples/power_torque.forge"));
+}
+
+#[test]
+fn explain_command_reports_inferred_dimensions() {
+    let script = example_path("axial_stress.forge");
+    let output = run_cli(&["explain", script.to_string_lossy().as_ref()]);
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Inferred dimensions:"));
+    assert!(stdout.contains("force   [L M T^-2]"));
+    assert!(stdout.contains("area    [L^2]"));
+    assert!(stdout.contains("stress  [L^-1 M T^-2]"));
+    assert!(stdout.contains("Outputs:"));
+    assert!(stdout.contains("print stress as MPa  compatible"));
+}
+
+#[test]
+fn explain_command_shares_semantic_errors() {
+    let script = example_path("dimension_error.forge");
+    let output = run_cli(&["explain", script.to_string_lossy().as_ref()]);
+    assert_eq!(output.status.code(), Some(1));
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("error: Cannot add incompatible quantities."));
+    assert!(stderr.contains("= Left operand dimension: [L^-1 M T^-2]"));
+    assert!(stderr.contains("= Right operand dimension: [L]"));
 }
 
 #[test]
@@ -179,6 +267,7 @@ fn invalid_command_shows_usage() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("Unknown command 'launch'"));
+    assert!(stderr.contains("Forge is a unit-safe engineering worksheet language"));
     assert!(stderr.contains("Usage:"));
 }
 
@@ -188,10 +277,28 @@ fn help_command_shows_usage() {
     assert!(output.status.success(), "help should succeed");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Forge is a unit-safe engineering worksheet language"));
     assert!(stdout.contains("Usage:"));
+    assert!(stdout.contains("Commands:"));
     assert!(stdout.contains("run <file>"));
     assert!(stdout.contains("check <file>"));
+    assert!(stdout.contains("explain <file>"));
+    assert!(stdout.contains("units"));
+    assert!(stdout.contains("examples"));
     assert!(stdout.contains("version"));
+    assert!(stdout.contains("help"));
+    assert!(stdout.contains("Examples:"));
+    assert!(stdout.contains("forge run examples/beam_bending.forge"));
+}
+
+#[test]
+fn long_help_flag_shows_usage() {
+    let output = run_cli(&["--help"]);
+    assert!(output.status.success(), "--help should succeed");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Forge is a unit-safe engineering worksheet language"));
+    assert!(stdout.contains("forge explain examples/axial_stress.forge"));
 }
 
 #[test]
@@ -202,5 +309,33 @@ fn run_command_requires_file_path() {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("Missing file path for 'run' command"));
+    assert!(stderr.contains("Usage for run:"));
+    assert!(stderr.contains("forge run <file>"));
     assert!(stderr.contains("Usage:"));
+}
+
+#[test]
+fn run_command_rejects_too_many_arguments() {
+    let output = run_cli(&["run", "examples/axial_stress.forge", "extra"]);
+    assert!(!output.status.success(), "command should fail");
+    assert_eq!(output.status.code(), Some(2));
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Too many arguments for 'run' command"));
+    assert!(stderr.contains("Usage for run:"));
+}
+
+#[test]
+fn argumentless_commands_reject_arguments() {
+    for command in ["units", "examples", "version", "help"] {
+        let output = run_cli(&[command, "extra"]);
+        assert!(!output.status.success(), "{command} should fail");
+        assert_eq!(output.status.code(), Some(2));
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(&format!("The '{command}' command does not take arguments.")),
+            "stderr for {command}: {stderr}"
+        );
+    }
 }

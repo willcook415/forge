@@ -1,0 +1,6 @@
+# Shaft power from torque and rotational rate.
+torque = 2.4 kN*m
+speed = 1800 / 1 min
+power = torque * speed
+print torque as N*m
+print power as kW

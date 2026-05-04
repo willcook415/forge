@@ -14,7 +14,10 @@ pub struct Parser {
 impl Parser {
     /// Creates a parser from a token stream.
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, position: 0 }
+        Self {
+            tokens,
+            position: 0,
+        }
     }
 
     /// Parses tokens into a program AST.
@@ -33,9 +36,7 @@ impl Parser {
         match self.current_kind() {
             TokenKind::Print => self.parse_print_statement(line, column),
             TokenKind::Identifier(_) => self.parse_assignment_statement(line, column),
-            _ => Err(self.error_at_current(
-                "expected a statement start (`print` or identifier)",
-            )),
+            _ => Err(self.error_at_current("expected a statement start (`print` or identifier)")),
         }
     }
 
@@ -572,12 +573,18 @@ mod tests {
     #[test]
     fn rejects_invalid_assignment_syntax() {
         let error = parse_err("force 12 kN");
-        assert!(error.contains("Invalid syntax"), "unexpected error: {error}");
+        assert!(
+            error.contains("Invalid syntax"),
+            "unexpected error: {error}"
+        );
         assert!(
             error.contains("expected '=' after variable name in assignment"),
             "unexpected error: {error}"
         );
-        assert!(error.contains("line 1 column 7"), "unexpected error: {error}");
+        assert!(
+            error.contains("line 1 column 7"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]
@@ -610,8 +617,17 @@ mod tests {
     #[test]
     fn rejects_unexpected_statement_start() {
         let error = parse_err("+ 1");
-        assert!(error.contains("Invalid syntax"), "unexpected error: {error}");
-        assert!(error.contains("expected a statement start"), "unexpected error: {error}");
-        assert!(error.contains("line 1 column 1"), "unexpected error: {error}");
+        assert!(
+            error.contains("Invalid syntax"),
+            "unexpected error: {error}"
+        );
+        assert!(
+            error.contains("expected a statement start"),
+            "unexpected error: {error}"
+        );
+        assert!(
+            error.contains("line 1 column 1"),
+            "unexpected error: {error}"
+        );
     }
 }

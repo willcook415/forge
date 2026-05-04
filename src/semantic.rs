@@ -1,4 +1,4 @@
-//! Semantic validation for Forge programs.
+//! Semantic validation and dimension analysis for Forge programs.
 
 use std::collections::HashMap;
 
@@ -10,15 +10,52 @@ use crate::units::{Dimension, UnitRegistry};
 #[derive(Debug, Default)]
 pub struct SemanticAnalyzer;
 
+/// Stable report produced by semantic analysis.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AnalysisReport {
+    /// Assignment dimensions in source order.
+    pub variables: Vec<VariableDimension>,
+    /// Print statements and requested conversions in source order.
+    pub outputs: Vec<OutputAnalysis>,
+}
+
+/// Inferred dimension for an assigned variable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VariableDimension {
+    /// Variable name.
+    pub name: String,
+    /// Inferred physical dimension.
+    pub dimension: Dimension,
+}
+
+/// Semantic result for a print statement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputAnalysis {
+    /// Rendered print expression.
+    pub expression: String,
+    /// Inferred expression dimension.
+    pub dimension: Dimension,
+    /// Optional target unit from `print expr as UNIT_EXPR`.
+    pub as_unit: Option<String>,
+    /// Whether the requested conversion is dimensionally compatible.
+    pub compatible: bool,
+}
+
 impl SemanticAnalyzer {
     /// Creates a semantic analyzer.
     pub fn new() -> Self {
         Self
     }
 
-    /// Validates a program according to Forge v0.1 rules.
+    /// Validates a program according to Forge rules.
     pub fn validate(&self, program: &Program) -> ForgeResult<()> {
+        self.analyze(program).map(|_| ())
+    }
+
+    /// Validates a program and returns inferred dimensions for worksheet inspection.
+    pub fn analyze(&self, program: &Program) -> ForgeResult<AnalysisReport> {
         let mut symbols: HashMap<String, Dimension> = HashMap::new();
+        let mut report = AnalysisReport::default();
 
         for statement in &program.statements {
             match statement {
@@ -30,6 +67,10 @@ impl SemanticAnalyzer {
                 } => {
                     let dimension = self.infer_dimension(value, &symbols, *line, *column)?;
                     symbols.insert(name.clone(), dimension);
+                    report.variables.push(VariableDimension {
+                        name: name.clone(),
+                        dimension,
+                    });
                 }
                 Statement::Print {
                     value,
@@ -38,26 +79,33 @@ impl SemanticAnalyzer {
                     column,
                 } => {
                     let value_dimension = self.infer_dimension(value, &symbols, *line, *column)?;
+                    let mut output = OutputAnalysis {
+                        expression: value.to_string(),
+                        dimension: value_dimension,
+                        as_unit: as_unit.as_ref().map(ToString::to_string),
+                        compatible: true,
+                    };
                     if let Some(unit_expr) = as_unit {
                         let target = UnitRegistry::resolve_expr(unit_expr)
                             .map_err(|error| with_statement_span(error, *line, *column))?;
                         if !value_dimension.is_compatible_with(target.dimension) {
+                            output.compatible = false;
                             return Err(ForgeError::with_span(
                                 format!(
                                     "Cannot convert expression to the requested unit.\nExpression dimension: {}\nTarget unit dimension: {}",
-                                    value_dimension,
-                                    target.dimension
+                                    value_dimension, target.dimension
                                 ),
                                 *line,
                                 *column,
                             ));
                         }
                     }
+                    report.outputs.push(output);
                 }
             }
         }
 
-        Ok(())
+        Ok(report)
     }
 
     fn infer_dimension(
@@ -101,8 +149,7 @@ impl SemanticAnalyzer {
                             return Err(ForgeError::with_span(
                                 format!(
                                     "{headline}\nLeft operand dimension: {}\nRight operand dimension: {}",
-                                    left_dimension,
-                                    right_dimension
+                                    left_dimension, right_dimension
                                 ),
                                 line,
                                 column,
@@ -183,7 +230,9 @@ mod tests {
         let mut parser = Parser::new(tokens);
         let program = parser.parse().map_err(|error| error.to_string())?;
         let analyzer = SemanticAnalyzer::new();
-        analyzer.validate(&program).map_err(|error| error.to_string())
+        analyzer
+            .validate(&program)
+            .map_err(|error| error.to_string())
     }
 
     #[test]
@@ -230,9 +279,43 @@ mod tests {
 
     #[test]
     fn rejects_unknown_units() {
-        let error = validate("x = 10 cm").expect_err("validation should fail");
-        assert!(error.contains("Unknown unit 'cm'"));
+        let error = validate("x = 10 inch").expect_err("validation should fail");
+        assert!(error.contains("Unknown unit 'inch'"));
         assert!(error.contains("Supported units are"));
         assert!(error.contains("line 1 column 1"));
+    }
+
+    #[test]
+    fn reports_inferred_dimensions_for_explain() {
+        let mut lexer = Lexer::new(
+            "force = 12 kN\narea = 300 mm^2\nstress = force / area\nprint stress as MPa",
+        );
+        let tokens = lexer.tokenize().expect("lexer should succeed");
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().expect("parser should succeed");
+        let analyzer = SemanticAnalyzer::new();
+        let report = analyzer.analyze(&program).expect("analysis should succeed");
+
+        assert_eq!(report.variables.len(), 3);
+        assert_eq!(report.variables[0].name, "force");
+        assert_eq!(
+            report.variables[0].dimension,
+            crate::units::Dimension::new(1, 1, -2)
+        );
+        assert_eq!(report.variables[1].name, "area");
+        assert_eq!(
+            report.variables[1].dimension,
+            crate::units::Dimension::new(2, 0, 0)
+        );
+        assert_eq!(report.variables[2].name, "stress");
+        assert_eq!(
+            report.variables[2].dimension,
+            crate::units::Dimension::new(-1, 1, -2)
+        );
+
+        assert_eq!(report.outputs.len(), 1);
+        assert_eq!(report.outputs[0].expression, "stress");
+        assert_eq!(report.outputs[0].as_unit.as_deref(), Some("MPa"));
+        assert!(report.outputs[0].compatible);
     }
 }

@@ -1,0 +1,7 @@
+# Pipe Reynolds number with dynamic viscosity.
+density = 998 kg/m^3
+velocity = 1.2 m/s
+diameter = 5 cm
+viscosity = 0.001 Pa*s
+reynolds = density * velocity * diameter / viscosity
+print reynolds

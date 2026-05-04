@@ -1,0 +1,4 @@
+# Invalid worksheet: a pressure load cannot be added directly to a length.
+pressure = 2 bar
+length = 3 m
+badtotal = pressure + length

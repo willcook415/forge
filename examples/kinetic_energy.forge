@@ -2,4 +2,4 @@
 mass = 1200 kg
 velocity = 20 m/s
 ke = 0.5 * mass * velocity^2
-print ke
+print ke as kJ

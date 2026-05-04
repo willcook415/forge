@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{BinaryOp, Expr, Program, Statement, UnaryOp, UnitExpr};
+use crate::ast::{BinaryOp, Expr, Program, Statement, UnaryOp};
 use crate::error::{ForgeError, ForgeResult};
 use crate::units::{Dimension, Quantity, UnitRegistry};
 
@@ -48,15 +48,15 @@ impl Interpreter {
                         let converted = result
                             .convert_to(target)
                             .map_err(|error| with_statement_span(error, *line, *column))?;
-                        output.push(format!(
-                            "{} {}",
-                            format_number(converted),
-                            format_unit_expr(target_expr)
-                        ));
+                        output.push(format!("{} {}", format_number(converted), target_expr));
                     } else if result.dimension == Dimension::default() {
                         output.push(format_number(result.value_si));
                     } else {
-                        output.push(format!("{} {}", format_number(result.value_si), result.dimension));
+                        output.push(format!(
+                            "{} {}",
+                            format_number(result.value_si),
+                            result.dimension
+                        ));
                     }
                 }
             }
@@ -130,19 +130,6 @@ impl Interpreter {
                 }
             }
         }
-    }
-}
-
-fn format_unit_expr(expr: &UnitExpr) -> String {
-    match expr {
-        UnitExpr::Unit(symbol) => symbol.clone(),
-        UnitExpr::Multiply(left, right) => {
-            format!("{}*{}", format_unit_expr(left), format_unit_expr(right))
-        }
-        UnitExpr::Divide(left, right) => {
-            format!("{}/{}", format_unit_expr(left), format_unit_expr(right))
-        }
-        UnitExpr::Power { base, exponent } => format!("{base}^{exponent}"),
     }
 }
 
@@ -222,7 +209,9 @@ mod tests {
             .validate(&program)
             .map_err(|error| error.to_string())?;
         let mut interpreter = Interpreter::new();
-        interpreter.evaluate(&program).map_err(|error| error.to_string())
+        interpreter
+            .evaluate(&program)
+            .map_err(|error| error.to_string())
     }
 
     fn run_example(filename: &str) -> Result<Vec<String>, String> {
@@ -248,7 +237,7 @@ mod tests {
     #[test]
     fn kinetic_energy_example_output() {
         let output = run_example("kinetic_energy.forge").expect("example should run");
-        assert_eq!(output, vec!["240000 [L^2 M T^-2]"]);
+        assert_eq!(output, vec!["240 kJ"]);
     }
 
     #[test]
@@ -261,6 +250,30 @@ mod tests {
     fn unit_conversion_example_output() {
         let output = run_example("unit_conversion.forge").expect("example should run");
         assert_eq!(output, vec!["2.5 m"]);
+    }
+
+    #[test]
+    fn beam_bending_example_output() {
+        let output = run_example("beam_bending.forge").expect("example should run");
+        assert_eq!(output, vec!["32.1429 MPa"]);
+    }
+
+    #[test]
+    fn pressure_vessel_example_output() {
+        let output = run_example("pressure_vessel.forge").expect("example should run");
+        assert_eq!(output, vec!["45 MPa"]);
+    }
+
+    #[test]
+    fn power_torque_example_output() {
+        let output = run_example("power_torque.forge").expect("example should run");
+        assert_eq!(output, vec!["2400 N*m", "72 kW"]);
+    }
+
+    #[test]
+    fn reynolds_number_example_output() {
+        let output = run_example("reynolds_number.forge").expect("example should run");
+        assert_eq!(output, vec!["59880"]);
     }
 
     #[test]
