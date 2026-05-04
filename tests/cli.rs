@@ -152,9 +152,9 @@ fn fails_for_invalid_dimensions_example() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let script = example_path("invalid_dimensions.forge");
     assert!(stderr.contains("error: Cannot add incompatible quantities."));
-    assert!(stderr.contains(&format!("{}:4:1", script.display())));
+    assert!(stderr.contains(&format!("{}:4:14", script.display())));
     assert!(stderr.contains("4 | bad = length + time"));
-    assert!(stderr.contains("^"));
+    assert!(stderr.contains("|              ^"));
     assert!(stderr.contains("= Left operand dimension: [L]"));
     assert!(stderr.contains("= Right operand dimension: [T]"));
     assert!(stderr.contains("= help: addition and subtraction require matching dimensions"));
@@ -263,14 +263,15 @@ fn examples_command_lists_demo_scripts() {
     );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Included examples:"));
+    assert!(stdout.contains("Repository examples (run from the Forge repo root):"));
     assert!(stdout.contains("axial_stress.forge"));
     assert!(stdout.contains("heat_energy.forge"));
     assert!(stdout.contains("shaft_power_rpm.forge"));
     assert!(stdout.contains("pressure_vessel.forge"));
-    assert!(stdout.contains("Suggested commands:"));
+    assert!(stdout.contains("Suggested commands from the Forge repository root:"));
     assert!(stdout.contains("forge new stress-check"));
     assert!(stdout.contains("forge run examples/shaft_power_rpm.forge"));
+    assert!(stdout.contains("forge explain examples/heat_energy.forge"));
 }
 
 #[test]
@@ -301,7 +302,8 @@ fn explain_command_shares_semantic_errors() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("error: Cannot add incompatible quantities."));
     assert!(stderr.contains("4 | badtotal = pressure + length"));
-    assert!(stderr.contains("^"));
+    assert!(stderr.contains(":4:21"));
+    assert!(stderr.contains("|                     ^"));
     assert!(stderr.contains("= Left operand dimension: [L^-1 M T^-2]"));
     assert!(stderr.contains("= Right operand dimension: [L]"));
 }

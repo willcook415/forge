@@ -11,16 +11,27 @@ pub fn render_file_error(path: &Path, source: Option<&str>, error: &ForgeError) 
 
     match (error.line, error.column) {
         (Some(line), Some(column)) => {
-            rendered.push_str(&format!("\n  --> {}:{line}:{column}", path.display()));
+            let mut diagnostic_column = column;
+            let mut source_line_for_marker = None;
             if let Some(source) = source {
                 if let Some(source_line) = source.lines().nth(line.saturating_sub(1)) {
-                    rendered.push_str("\n   |");
-                    let line_number = line.to_string();
-                    let expanded_line = expand_tabs(source_line);
-                    let marker_padding = caret_padding(source_line, column);
-                    rendered.push_str(&format!("\n{line_number:>3} | {expanded_line}"));
-                    rendered.push_str(&format!("\n   | {marker_padding}^"));
+                    diagnostic_column =
+                        refined_caret_column(headline, source_line, column).unwrap_or(column);
+                    source_line_for_marker = Some(source_line);
                 }
+            }
+
+            rendered.push_str(&format!(
+                "\n  --> {}:{line}:{diagnostic_column}",
+                path.display()
+            ));
+            if let Some(source_line) = source_line_for_marker {
+                rendered.push_str("\n   |");
+                let line_number = line.to_string();
+                let expanded_line = expand_tabs(source_line);
+                let marker_padding = caret_padding(source_line, diagnostic_column);
+                rendered.push_str(&format!("\n{line_number:>3} | {expanded_line}"));
+                rendered.push_str(&format!("\n   | {marker_padding}^"));
             }
         }
         _ => rendered.push_str(&format!("\n  --> {}", path.display())),
@@ -69,6 +80,29 @@ fn caret_padding(source_line: &str, column: usize) -> String {
     " ".repeat(width)
 }
 
+fn refined_caret_column(headline: &str, source_line: &str, fallback: usize) -> Option<usize> {
+    if headline.contains("Cannot add incompatible quantities") {
+        find_binary_operator_after_assignment(source_line, '+')
+    } else if headline.contains("Cannot subtract incompatible quantities") {
+        find_binary_operator_after_assignment(source_line, '-')
+    } else {
+        Some(fallback)
+    }
+}
+
+fn find_binary_operator_after_assignment(source_line: &str, operator: char) -> Option<usize> {
+    let start_index = source_line
+        .char_indices()
+        .find(|(_, ch)| *ch == '=')
+        .map(|(index, ch)| index + ch.len_utf8())
+        .unwrap_or(0);
+
+    source_line[start_index..]
+        .char_indices()
+        .find(|(_, ch)| *ch == operator)
+        .map(|(relative_index, _)| source_line[..start_index + relative_index].chars().count() + 1)
+}
+
 fn diagnostic_help(headline: &str) -> Option<&'static str> {
     if headline.contains("Cannot add incompatible quantities")
         || headline.contains("Cannot subtract incompatible quantities")
@@ -109,9 +143,9 @@ mod tests {
 
         let rendered = render_file_error(Path::new("main.forge"), Some(source), &error);
         assert!(rendered.contains("error: Cannot add incompatible quantities."));
-        assert!(rendered.contains("--> main.forge:3:1"));
+        assert!(rendered.contains("--> main.forge:3:19"));
         assert!(rendered.contains("3 | result = pressure + length"));
-        assert!(rendered.contains("| ^"));
+        assert!(rendered.contains("|                   ^"));
         assert!(rendered.contains("= Left operand dimension: [L^-1 M T^-2]"));
         assert!(rendered.contains("= help: addition and subtraction require matching dimensions"));
     }

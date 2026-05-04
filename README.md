@@ -13,6 +13,12 @@ cargo install --path .
 forge version
 ```
 
+After making local source changes, reinstall the CLI with:
+
+```bash
+cargo install --path . --force
+```
+
 After installation, use Forge as a normal CLI:
 
 ```bash
@@ -33,7 +39,7 @@ Inspect supported units:
 forge units
 ```
 
-Run an engineering worksheet:
+Run a repository example from the Forge repo root:
 
 ```bash
 forge run examples/heat_energy.forge
@@ -137,10 +143,10 @@ forge check examples/dimension_error.forge
 
 ```text
 error: Cannot add incompatible quantities.
-  --> examples/dimension_error.forge:4:1
+  --> examples/dimension_error.forge:4:21
    |
   4 | badtotal = pressure + length
-   | ^
+   |                     ^
    |
    = Left operand dimension: [L^-1 M T^-2]
    = Right operand dimension: [L]
@@ -182,6 +188,8 @@ Forge uses `[Theta]` for temperature in dimension output. `K` is a temperature-d
 
 ## Examples
 
+These scripts live in the repository `examples/` directory. The suggested `forge run examples/...` commands assume you are running from the Forge repository root.
+
 - `examples/axial_stress.forge`: axial stress from force and area
 - `examples/beam_bending.forge`: bending stress from moment, section depth, and inertia
 - `examples/pressure_vessel.forge`: thin-wall hoop stress estimate
@@ -207,7 +215,7 @@ Forge uses `[Theta]` for temperature in dimension output. `K` is a temperature-d
 
 ## Demo Commands
 
-Good terminal screenshots:
+Good terminal screenshots from the Forge repository root:
 
 ```bash
 forge help
