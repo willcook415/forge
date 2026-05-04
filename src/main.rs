@@ -1,10 +1,12 @@
 //! Forge CLI entrypoint.
 
 mod ast;
+mod diagnostic;
 mod error;
 mod interpreter;
 mod lexer;
 mod parser;
+mod project;
 mod semantic;
 mod token;
 mod units;
@@ -12,10 +14,12 @@ mod units;
 use ast::Program;
 use std::path::Path;
 
+use diagnostic::render_file_error;
 use error::{ForgeError, ForgeResult};
 use interpreter::Interpreter;
 use lexer::Lexer;
 use parser::Parser;
+use project::create_project;
 use semantic::{AnalysisReport, SemanticAnalyzer};
 use units::UnitRegistry;
 
@@ -65,25 +69,9 @@ fn read_script(path: &Path) -> ForgeResult<String> {
     })
 }
 
-fn run_file(path: &Path) -> ForgeResult<Vec<String>> {
-    let source = read_script(path)?;
-    run_source(&source)
-}
-
-fn check_file(path: &Path) -> ForgeResult<()> {
-    let source = read_script(path)?;
-    check_source(&source)
-}
-
-fn explain_file(path: &Path) -> ForgeResult<String> {
-    let source = read_script(path)?;
-    let (_, report) = parse_and_analyze_source(&source)?;
-    Ok(format_analysis_report(&report))
-}
-
 fn usage(program: &str) -> String {
     format!(
-        "{DESCRIPTION}\n\nUsage:\n  {program} <command> [args]\n\nCommands:\n  run <file>       Validate and execute a Forge script\n  check <file>     Validate a script without executing it\n  explain <file>   Show inferred dimensions and output conversions\n  units            List supported built-in units\n  examples         List included example scripts and demo commands\n  version          Print the Forge version\n  help             Show this help text\n\nExamples:\n  {program} version\n  {program} units\n  {program} explain examples/axial_stress.forge\n  {program} run examples/beam_bending.forge\n  {program} check examples/dimension_error.forge"
+        "{DESCRIPTION}\n\nUsage:\n  {program} <command> [args]\n\nCommands:\n  run <file>             Validate and execute a Forge script\n  check <file>           Validate a script without executing it\n  explain <file>         Show inferred dimensions and output conversions\n  new <project-name>     Create a starter Forge worksheet project\n  units                  List supported built-in units\n  examples               List included example scripts and demo commands\n  version                Print the Forge version\n  help                   Show this help text\n\nExamples:\n  {program} version\n  {program} units\n  {program} new stress-check\n  {program} explain examples/axial_stress.forge\n  {program} run examples/beam_bending.forge\n  {program} check examples/dimension_error.forge"
     )
 }
 
@@ -96,6 +84,7 @@ fn command_error_hint(command: &str) -> String {
         "run" => "Usage for run:\n  forge run <file>",
         "check" => "Usage for check:\n  forge check <file>",
         "explain" => "Usage for explain:\n  forge explain <file>",
+        "new" => "Usage for new:\n  forge new <project-name>",
         "units" => "Usage for units:\n  forge units",
         "examples" => "Usage for examples:\n  forge examples",
         "version" => "Usage for version:\n  forge version",
@@ -169,39 +158,8 @@ fn format_analysis_report(report: &AnalysisReport) -> String {
 
 fn format_examples_listing(program: &str) -> String {
     format!(
-        "Included examples:\n  axial_stress.forge       axial stress from force and area\n  beam_bending.forge       bending stress from moment and section inertia\n  pressure_vessel.forge    thin-wall hoop stress estimate\n  power_torque.forge       torque and rotational rate converted to power\n  reynolds_number.forge    dimensionless Reynolds number\n  dimension_error.forge    intentional unit mistake for diagnostics\n\nSuggested commands:\n  {program} explain examples/axial_stress.forge\n  {program} run examples/pressure_vessel.forge\n  {program} run examples/power_torque.forge\n  {program} check examples/dimension_error.forge"
+        "Included examples:\n  axial_stress.forge        axial stress from force and area\n  beam_bending.forge        bending stress from moment and section inertia\n  pressure_vessel.forge     thin-wall hoop stress estimate\n  power_torque.forge        torque and rotational rate converted to power\n  shaft_power_rpm.forge     shaft power from torque and rpm\n  heat_energy.forge         heat energy from mass, heat capacity, and temperature rise\n  imperial_pressure.forge   pressure conversion from psi\n  fluid_volume_flow.forge   volumetric flow rate using litres\n  reynolds_number.forge     dimensionless Reynolds number\n  dimension_error.forge     intentional unit mistake for diagnostics\n\nSuggested commands:\n  {program} new stress-check\n  {program} explain examples/axial_stress.forge\n  {program} run examples/heat_energy.forge\n  {program} run examples/shaft_power_rpm.forge\n  {program} run examples/imperial_pressure.forge\n  {program} check examples/dimension_error.forge"
     )
-}
-
-fn split_message(message: &str) -> (&str, Vec<&str>) {
-    let mut lines = message.lines();
-    let headline = lines.next().unwrap_or("Unknown Forge error.");
-    let details = lines
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .collect::<Vec<_>>();
-    (headline, details)
-}
-
-fn format_cli_error(path: &Path, error: &ForgeError) -> String {
-    let (headline, details) = split_message(&error.message);
-
-    let mut rendered = format!("error: {headline}");
-    match (error.line, error.column) {
-        (Some(line), Some(column)) => {
-            rendered.push_str(&format!("\n  --> {}:{}:{}", path.display(), line, column))
-        }
-        _ => rendered.push_str(&format!("\n  --> {}", path.display())),
-    }
-
-    if !details.is_empty() {
-        rendered.push_str("\n   |");
-        for detail in details {
-            rendered.push_str(&format!("\n   = {detail}"));
-        }
-    }
-
-    rendered
 }
 
 fn main() {
@@ -242,14 +200,23 @@ fn main() {
                 std::process::exit(2);
             }
 
-            match run_file(Path::new(&path)) {
+            let path = Path::new(&path);
+            let source = match read_script(path) {
+                Ok(source) => source,
+                Err(error) => {
+                    eprintln!("{}", render_file_error(path, None, &error));
+                    std::process::exit(1);
+                }
+            };
+
+            match run_source(&source) {
                 Ok(output) => {
                     for line in output {
                         println!("{line}");
                     }
                 }
                 Err(error) => {
-                    eprintln!("{}", format_cli_error(Path::new(&path), &error));
+                    eprintln!("{}", render_file_error(path, Some(&source), &error));
                     std::process::exit(1);
                 }
             }
@@ -271,12 +238,21 @@ fn main() {
                 std::process::exit(2);
             }
 
-            match check_file(Path::new(&path)) {
+            let path = Path::new(&path);
+            let source = match read_script(path) {
+                Ok(source) => source,
+                Err(error) => {
+                    eprintln!("{}", render_file_error(path, None, &error));
+                    std::process::exit(1);
+                }
+            };
+
+            match check_source(&source) {
                 Ok(()) => {
-                    println!("Check passed: {}", path);
+                    println!("Check passed: {}", path.display());
                 }
                 Err(error) => {
-                    eprintln!("{}", format_cli_error(Path::new(&path), &error));
+                    eprintln!("{}", render_file_error(path, Some(&source), &error));
                     std::process::exit(1);
                 }
             }
@@ -298,10 +274,58 @@ fn main() {
                 std::process::exit(2);
             }
 
-            match explain_file(Path::new(&path)) {
+            let path = Path::new(&path);
+            let source = match read_script(path) {
+                Ok(source) => source,
+                Err(error) => {
+                    eprintln!("{}", render_file_error(path, None, &error));
+                    std::process::exit(1);
+                }
+            };
+
+            match parse_and_analyze_source(&source)
+                .map(|(_, report)| format_analysis_report(&report))
+            {
                 Ok(report) => println!("{report}"),
                 Err(error) => {
-                    eprintln!("{}", format_cli_error(Path::new(&path), &error));
+                    eprintln!("{}", render_file_error(path, Some(&source), &error));
+                    std::process::exit(1);
+                }
+            }
+        }
+        "new" => {
+            let Some(project_name) = args.next() else {
+                eprintln!(
+                    "Missing project name for 'new' command.\n\n{}",
+                    command_usage(&program, "new")
+                );
+                std::process::exit(2);
+            };
+
+            if args.next().is_some() {
+                eprintln!(
+                    "Too many arguments for 'new' command.\n\n{}",
+                    command_usage(&program, "new")
+                );
+                std::process::exit(2);
+            }
+
+            let cwd = match std::env::current_dir() {
+                Ok(cwd) => cwd,
+                Err(error) => {
+                    eprintln!("error: Failed to determine current directory: {error}");
+                    std::process::exit(1);
+                }
+            };
+
+            match create_project(&project_name, &cwd) {
+                Ok(()) => {
+                    println!(
+                        "Created Forge worksheet project: {project_name}\n\nNext:\n  cd {project_name}\n  forge run main.forge\n  forge explain main.forge"
+                    );
+                }
+                Err(error) => {
+                    eprintln!("error: {}", error.message);
                     std::process::exit(1);
                 }
             }

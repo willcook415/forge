@@ -7,12 +7,18 @@
 - Explicit `forge` binary target metadata for local installation.
 - Improved CLI help text with command descriptions and example commands.
 - `forge examples` command for demo-friendly example discovery.
+- Compiler-style diagnostics with source snippets and caret markers for file-backed errors.
+- `forge new <project-name>` command for starter worksheet projects.
+- Temperature as a base dimension, displayed as `[Theta]`, with Kelvin temperature-difference unit `K`.
+- Broader practical unit coverage: `um`, `in`, `ft`, `ms`, `lbf`, `kip`, `psi`, `L`, `mL`, `Wh`, `kWh`, `rad`, `rev`, and `rpm`.
+- New examples for heat energy, imperial pressure conversion, shaft power with rpm, and fluid volume flow.
 - GitHub Actions workflow for formatting, tests, and release binary artifacts across Windows, Linux, and macOS.
 - Release build notes in `docs/release.md`.
 
 ### Changed
 
 - README now leads with `cargo install --path .` and installed `forge ...` commands, while keeping `cargo run -- ...` as a development fallback.
+- README now documents Kelvin-only temperature differences, dimensionless angle handling, and `rpm` angular-speed conversion.
 
 ## v0.2.0
 

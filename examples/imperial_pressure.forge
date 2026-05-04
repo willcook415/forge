@@ -1,0 +1,4 @@
+# Convert a hydraulic pressure from psi.
+pressure = 125 psi
+print pressure as kPa
+print pressure as bar

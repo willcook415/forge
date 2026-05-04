@@ -277,6 +277,30 @@ mod tests {
     }
 
     #[test]
+    fn heat_energy_example_output() {
+        let output = run_example("heat_energy.forge").expect("example should run");
+        assert_eq!(output, vec!["292.6 kJ"]);
+    }
+
+    #[test]
+    fn imperial_pressure_example_output() {
+        let output = run_example("imperial_pressure.forge").expect("example should run");
+        assert_eq!(output, vec!["861.845 kPa", "8.61845 bar"]);
+    }
+
+    #[test]
+    fn shaft_power_rpm_example_output() {
+        let output = run_example("shaft_power_rpm.forge").expect("example should run");
+        assert_eq!(output, vec!["47.1239 kW"]);
+    }
+
+    #[test]
+    fn fluid_volume_flow_example_output() {
+        let output = run_example("fluid_volume_flow.forge").expect("example should run");
+        assert_eq!(output, vec!["0.4 L/s", "400 mL/s"]);
+    }
+
+    #[test]
     fn evaluates_arithmetic_operations() {
         let source = "a = 10\nb = 3\nprint a + b\nprint a - b\nprint a * b\nprint a / b\nprint -b\nprint 2^3";
         let output = run_source(source).expect("script should run");
@@ -295,6 +319,56 @@ mod tests {
         let source = "force = 12 kN\nprint force as N";
         let output = run_source(source).expect("script should run");
         assert_eq!(output, vec!["12000 N"]);
+    }
+
+    #[test]
+    fn evaluates_practical_unit_conversions() {
+        let source = "\
+print 1 in as mm
+print 3 ft as m
+print 2 L as m^3
+print 750 mL as L
+print 2 Wh as J
+print 1 kWh as kJ
+print 1 rev as rad
+print 6.283185307179586 rad as rev";
+        let output = run_source(source).expect("script should run");
+        assert_eq!(
+            output,
+            vec![
+                "25.4 mm",
+                "0.9144 m",
+                "0.002 m^3",
+                "0.75 L",
+                "7200 J",
+                "3600 kJ",
+                "6.28319 rad",
+                "1 rev",
+            ]
+        );
+    }
+
+    #[test]
+    fn evaluates_heat_energy_with_temperature_dimension() {
+        let source = "\
+mass = 2 kg
+specificheat = 4180 J/kg/K
+deltat = 35 K
+energy = mass * specificheat * deltat
+print energy as kJ";
+        let output = run_source(source).expect("script should run");
+        assert_eq!(output, vec!["292.6 kJ"]);
+    }
+
+    #[test]
+    fn evaluates_rpm_shaft_power() {
+        let source = "\
+torque = 250 N*m
+speed = 1800 rpm
+power = torque * speed
+print power as kW";
+        let output = run_source(source).expect("script should run");
+        assert_eq!(output, vec!["47.1239 kW"]);
     }
 
     #[test]

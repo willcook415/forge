@@ -5,7 +5,7 @@ use std::fmt;
 use crate::ast::UnitExpr;
 use crate::error::{ForgeError, ForgeResult};
 
-/// Dimension vector using base dimensions Length, Mass, and Time.
+/// Dimension vector using base dimensions Length, Mass, Time, and Temperature.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Dimension {
     /// Exponent for Length (L).
@@ -14,12 +14,29 @@ pub struct Dimension {
     pub mass: i32,
     /// Exponent for Time (T).
     pub time: i32,
+    /// Exponent for Temperature (Theta).
+    pub temperature: i32,
 }
 
 impl Dimension {
     /// Creates a dimension vector from base exponents.
     pub const fn new(length: i32, mass: i32, time: i32) -> Self {
-        Self { length, mass, time }
+        Self {
+            length,
+            mass,
+            time,
+            temperature: 0,
+        }
+    }
+
+    /// Creates a dimension vector including temperature.
+    pub const fn with_temperature(length: i32, mass: i32, time: i32, temperature: i32) -> Self {
+        Self {
+            length,
+            mass,
+            time,
+            temperature,
+        }
     }
 
     /// Combines dimensions for multiplication.
@@ -28,6 +45,7 @@ impl Dimension {
             length: self.length + other.length,
             mass: self.mass + other.mass,
             time: self.time + other.time,
+            temperature: self.temperature + other.temperature,
         }
     }
 
@@ -37,6 +55,7 @@ impl Dimension {
             length: self.length - other.length,
             mass: self.mass - other.mass,
             time: self.time - other.time,
+            temperature: self.temperature - other.temperature,
         }
     }
 
@@ -46,6 +65,7 @@ impl Dimension {
             length: self.length * exponent,
             mass: self.mass * exponent,
             time: self.time * exponent,
+            temperature: self.temperature * exponent,
         }
     }
 
@@ -62,6 +82,7 @@ impl fmt::Display for Dimension {
         append_dimension_part(&mut parts, "L", self.length);
         append_dimension_part(&mut parts, "M", self.mass);
         append_dimension_part(&mut parts, "T", self.time);
+        append_dimension_part(&mut parts, "Theta", self.temperature);
 
         if parts.is_empty() {
             write!(f, "[1]")
@@ -189,6 +210,12 @@ pub enum UnitCategory {
     EnergyWork,
     /// Power units.
     Power,
+    /// Volume units.
+    Volume,
+    /// Temperature-difference units.
+    Temperature,
+    /// Dimensionless angle and rotational-rate units.
+    AngleRotation,
 }
 
 impl UnitCategory {
@@ -200,8 +227,11 @@ impl UnitCategory {
             UnitCategory::Time => "Time",
             UnitCategory::Force => "Force",
             UnitCategory::PressureStress => "Pressure / Stress",
+            UnitCategory::Volume => "Volume",
             UnitCategory::EnergyWork => "Energy / Work",
             UnitCategory::Power => "Power",
+            UnitCategory::Temperature => "Temperature",
+            UnitCategory::AngleRotation => "Angle / Rotation",
         }
     }
 }
@@ -212,8 +242,11 @@ const UNIT_CATEGORIES: &[UnitCategory] = &[
     UnitCategory::Time,
     UnitCategory::Force,
     UnitCategory::PressureStress,
+    UnitCategory::Volume,
     UnitCategory::EnergyWork,
     UnitCategory::Power,
+    UnitCategory::Temperature,
+    UnitCategory::AngleRotation,
 ];
 
 const BUILTIN_UNITS: &[UnitDef] = &[
@@ -236,8 +269,26 @@ const BUILTIN_UNITS: &[UnitDef] = &[
         category: UnitCategory::Length,
     },
     UnitDef {
+        symbol: "um",
+        scale_to_si: 0.000_001,
+        dimension: Dimension::new(1, 0, 0),
+        category: UnitCategory::Length,
+    },
+    UnitDef {
         symbol: "km",
         scale_to_si: 1000.0,
+        dimension: Dimension::new(1, 0, 0),
+        category: UnitCategory::Length,
+    },
+    UnitDef {
+        symbol: "in",
+        scale_to_si: 0.0254,
+        dimension: Dimension::new(1, 0, 0),
+        category: UnitCategory::Length,
+    },
+    UnitDef {
+        symbol: "ft",
+        scale_to_si: 0.3048,
         dimension: Dimension::new(1, 0, 0),
         category: UnitCategory::Length,
     },
@@ -262,6 +313,12 @@ const BUILTIN_UNITS: &[UnitDef] = &[
     UnitDef {
         symbol: "s",
         scale_to_si: 1.0,
+        dimension: Dimension::new(0, 0, 1),
+        category: UnitCategory::Time,
+    },
+    UnitDef {
+        symbol: "ms",
+        scale_to_si: 0.001,
         dimension: Dimension::new(0, 0, 1),
         category: UnitCategory::Time,
     },
@@ -296,6 +353,18 @@ const BUILTIN_UNITS: &[UnitDef] = &[
         category: UnitCategory::Force,
     },
     UnitDef {
+        symbol: "lbf",
+        scale_to_si: 4.448_221_615_260_5,
+        dimension: Dimension::new(1, 1, -2),
+        category: UnitCategory::Force,
+    },
+    UnitDef {
+        symbol: "kip",
+        scale_to_si: 4448.221_615_260_5,
+        dimension: Dimension::new(1, 1, -2),
+        category: UnitCategory::Force,
+    },
+    UnitDef {
         symbol: "Pa",
         scale_to_si: 1.0,
         dimension: Dimension::new(-1, 1, -2),
@@ -326,6 +395,24 @@ const BUILTIN_UNITS: &[UnitDef] = &[
         category: UnitCategory::PressureStress,
     },
     UnitDef {
+        symbol: "psi",
+        scale_to_si: 6894.757_293_168,
+        dimension: Dimension::new(-1, 1, -2),
+        category: UnitCategory::PressureStress,
+    },
+    UnitDef {
+        symbol: "L",
+        scale_to_si: 0.001,
+        dimension: Dimension::new(3, 0, 0),
+        category: UnitCategory::Volume,
+    },
+    UnitDef {
+        symbol: "mL",
+        scale_to_si: 0.000_001,
+        dimension: Dimension::new(3, 0, 0),
+        category: UnitCategory::Volume,
+    },
+    UnitDef {
         symbol: "J",
         scale_to_si: 1.0,
         dimension: Dimension::new(2, 1, -2),
@@ -334,6 +421,18 @@ const BUILTIN_UNITS: &[UnitDef] = &[
     UnitDef {
         symbol: "kJ",
         scale_to_si: 1000.0,
+        dimension: Dimension::new(2, 1, -2),
+        category: UnitCategory::EnergyWork,
+    },
+    UnitDef {
+        symbol: "Wh",
+        scale_to_si: 3600.0,
+        dimension: Dimension::new(2, 1, -2),
+        category: UnitCategory::EnergyWork,
+    },
+    UnitDef {
+        symbol: "kWh",
+        scale_to_si: 3_600_000.0,
         dimension: Dimension::new(2, 1, -2),
         category: UnitCategory::EnergyWork,
     },
@@ -348,6 +447,30 @@ const BUILTIN_UNITS: &[UnitDef] = &[
         scale_to_si: 1000.0,
         dimension: Dimension::new(2, 1, -3),
         category: UnitCategory::Power,
+    },
+    UnitDef {
+        symbol: "K",
+        scale_to_si: 1.0,
+        dimension: Dimension::with_temperature(0, 0, 0, 1),
+        category: UnitCategory::Temperature,
+    },
+    UnitDef {
+        symbol: "rad",
+        scale_to_si: 1.0,
+        dimension: Dimension::new(0, 0, 0),
+        category: UnitCategory::AngleRotation,
+    },
+    UnitDef {
+        symbol: "rev",
+        scale_to_si: 6.283_185_307_179_586,
+        dimension: Dimension::new(0, 0, 0),
+        category: UnitCategory::AngleRotation,
+    },
+    UnitDef {
+        symbol: "rpm",
+        scale_to_si: 0.104_719_755_119_659_77,
+        dimension: Dimension::new(0, 0, -1),
+        category: UnitCategory::AngleRotation,
     },
 ];
 
@@ -501,6 +624,11 @@ mod tests {
         let cm = UnitRegistry::resolve("cm").expect("cm should exist");
         assert_eq!(cm.scale_to_si, 0.01);
         assert_eq!(cm.dimension, Dimension::new(1, 0, 0));
+
+        let kelvin = UnitRegistry::resolve("K").expect("K should exist");
+        assert_eq!(kelvin.scale_to_si, 1.0);
+        assert_eq!(kelvin.dimension, Dimension::with_temperature(0, 0, 0, 1));
+        assert_eq!(kelvin.dimension.to_string(), "[Theta]");
     }
 
     #[test]
@@ -557,6 +685,18 @@ mod tests {
             .expect("kJ should resolve");
         let kw = UnitRegistry::resolve_expr(&UnitExpr::Unit("kW".to_string()))
             .expect("kW should resolve");
+        let inch = UnitRegistry::resolve_expr(&UnitExpr::Unit("in".to_string()))
+            .expect("in should resolve");
+        let foot = UnitRegistry::resolve_expr(&UnitExpr::Unit("ft".to_string()))
+            .expect("ft should resolve");
+        let litre =
+            UnitRegistry::resolve_expr(&UnitExpr::Unit("L".to_string())).expect("L should resolve");
+        let millilitre = UnitRegistry::resolve_expr(&UnitExpr::Unit("mL".to_string()))
+            .expect("mL should resolve");
+        let kilowatt_hour = UnitRegistry::resolve_expr(&UnitExpr::Unit("kWh".to_string()))
+            .expect("kWh should resolve");
+        let rpm = UnitRegistry::resolve_expr(&UnitExpr::Unit("rpm".to_string()))
+            .expect("rpm should resolve");
 
         approx_equal(Quantity::from_unit(250.0, cm).value_si, 2.5);
         approx_equal(Quantity::from_unit(3.0, km).value_si, 3000.0);
@@ -569,6 +709,18 @@ mod tests {
         approx_equal(Quantity::from_unit(1.2, gpa).value_si, 1_200_000_000.0);
         approx_equal(Quantity::from_unit(4.5, kj).value_si, 4500.0);
         approx_equal(Quantity::from_unit(12.0, kw).value_si, 12_000.0);
+        approx_equal(Quantity::from_unit(2.0, inch).value_si, 0.0508);
+        approx_equal(Quantity::from_unit(10.0, foot).value_si, 3.048);
+        approx_equal(Quantity::from_unit(2.5, litre).value_si, 0.0025);
+        approx_equal(Quantity::from_unit(750.0, millilitre).value_si, 0.00075);
+        approx_equal(
+            Quantity::from_unit(1.0, kilowatt_hour).value_si,
+            3_600_000.0,
+        );
+        approx_equal(
+            Quantity::from_unit(60.0, rpm).value_si,
+            6.283_185_307_179_586,
+        );
     }
 
     #[test]
@@ -599,6 +751,20 @@ mod tests {
         .expect("kN*m should resolve");
         approx_equal(moment_unit.scale_to_si, 1000.0);
         assert_eq!(moment_unit.dimension, Dimension::new(2, 1, -2));
+
+        let specific_heat_unit = UnitRegistry::resolve_expr(&UnitExpr::Divide(
+            Box::new(UnitExpr::Divide(
+                Box::new(UnitExpr::Unit("J".to_string())),
+                Box::new(UnitExpr::Unit("kg".to_string())),
+            )),
+            Box::new(UnitExpr::Unit("K".to_string())),
+        ))
+        .expect("J/kg/K should resolve");
+        approx_equal(specific_heat_unit.scale_to_si, 1.0);
+        assert_eq!(
+            specific_heat_unit.dimension,
+            Dimension::with_temperature(2, 0, -2, -1)
+        );
     }
 
     #[test]
@@ -606,12 +772,24 @@ mod tests {
         let categories = UnitRegistry::categories();
         assert!(categories.contains(&crate::units::UnitCategory::Length));
         assert!(categories.contains(&crate::units::UnitCategory::Power));
+        assert!(categories.contains(&crate::units::UnitCategory::Volume));
+        assert!(categories.contains(&crate::units::UnitCategory::Temperature));
+        assert!(categories.contains(&crate::units::UnitCategory::AngleRotation));
 
         let pressure_symbols =
             UnitRegistry::units_in_category(crate::units::UnitCategory::PressureStress)
                 .map(|unit| unit.symbol)
                 .collect::<Vec<_>>();
-        assert_eq!(pressure_symbols, vec!["Pa", "kPa", "MPa", "GPa", "bar"]);
+        assert_eq!(
+            pressure_symbols,
+            vec!["Pa", "kPa", "MPa", "GPa", "bar", "psi"]
+        );
+
+        let angle_symbols =
+            UnitRegistry::units_in_category(crate::units::UnitCategory::AngleRotation)
+                .map(|unit| unit.symbol)
+                .collect::<Vec<_>>();
+        assert_eq!(angle_symbols, vec!["rad", "rev", "rpm"]);
     }
 
     #[test]
@@ -684,11 +862,13 @@ mod tests {
 
     #[test]
     fn reports_unknown_unit_with_supported_list() {
-        let error = UnitRegistry::resolve_expr(&UnitExpr::Unit("inch".to_string()))
+        let error = UnitRegistry::resolve_expr(&UnitExpr::Unit("slug".to_string()))
             .expect_err("unknown unit should fail");
-        assert!(error.message.contains("Unknown unit 'inch'"));
+        assert!(error.message.contains("Unknown unit 'slug'"));
         assert!(error.message.contains("Supported units"));
         assert!(error.message.contains("GPa"));
         assert!(error.message.contains("kW"));
+        assert!(error.message.contains("psi"));
+        assert!(error.message.contains("rpm"));
     }
 }

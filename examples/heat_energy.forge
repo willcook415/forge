@@ -1,0 +1,6 @@
+# Heat energy for a water temperature rise.
+mass = 2 kg
+specificheat = 4180 J/kg/K
+deltat = 35 K
+energy = mass * specificheat * deltat
+print energy as kJ

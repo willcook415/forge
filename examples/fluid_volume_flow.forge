@@ -1,0 +1,6 @@
+# Simple volumetric flow rate.
+volume = 12 L
+time = 30 s
+flow = volume / time
+print flow as L/s
+print flow as mL/s

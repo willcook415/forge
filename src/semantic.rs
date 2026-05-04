@@ -279,8 +279,8 @@ mod tests {
 
     #[test]
     fn rejects_unknown_units() {
-        let error = validate("x = 10 inch").expect_err("validation should fail");
-        assert!(error.contains("Unknown unit 'inch'"));
+        let error = validate("x = 10 slug").expect_err("validation should fail");
+        assert!(error.contains("Unknown unit 'slug'"));
         assert!(error.contains("Supported units are"));
         assert!(error.contains("line 1 column 1"));
     }
