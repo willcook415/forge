@@ -1,4 +1,4 @@
-# Forge Architecture (v0.1)
+# Forge Architecture (v0.2)
 
 This document explains how Forge is structured today so new contributors can navigate the codebase quickly.
 
@@ -91,7 +91,7 @@ Checks performed:
 - `print expr as UNIT_EXPR` must be conversion-compatible
 - Exponent usage:
   - exponent dimension must be dimensionless
-  - exponent must be integer-literal compatible for v0.1
+  - exponent must be integer-literal compatible for v0.2
 
 How it works:
 - Walk AST and infer dimensions
@@ -113,15 +113,19 @@ How it works:
 - `L` (Length)
 - `M` (Mass)
 - `T` (Time)
+- `Theta` (Temperature difference)
 
 Example display:
 - `[L]`
 - `[L M T^-2]`
 - `[1]` (dimensionless)
 
-### Built-in units (v0.1)
+### Built-in units (v0.2)
 
-`m`, `mm`, `s`, `kg`, `N`, `kN`, `Pa`, `kPa`, `MPa`
+The registry includes SI and imperial engineering units, temperature differences
+in `K`, and dimensionless angles (`rad`, `rev`) with angular speed in `rpm`.
+Use `forge units` for the complete registry or see the [README](../README.md#supported-units).
+Absolute Celsius/Fahrenheit and user-defined units are not implemented.
 
 ### Unit expression resolution
 
@@ -180,9 +184,9 @@ Formatting:
 - plain-English message
 - optional line/column span
 
-Display behavior:
-- Single-line: `Message at line X column Y`
-- Multi-line details keep span on first line, then print extra context lines
+File-backed commands use `src/diagnostic.rs` to render the file path, line and
+column, source snippet, caret, dimension details and help text. Errors without
+a usable source location retain a plain-text fallback.
 
 Typical detailed diagnostics include:
 - unknown variable / unknown unit

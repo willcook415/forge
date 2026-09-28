@@ -1,96 +1,8 @@
 # Forge
 
-Forge is a unit-safe engineering worksheet language for calculations where physical dimensions matter.
+Forge is a unit-safe engineering worksheet language written in Rust. It checks physical dimensions before executing calculations, with SI-based quantities, composed units and source-located diagnostics.
 
-It lets you write small scripts with quantities such as `12 kN`, `300 mm^2`, `125 psi`, or `4180 J/kg/K`, then validates dimensional correctness before running them.
-
-## Install
-
-From the repository root:
-
-```bash
-cargo install --path .
-forge version
-```
-
-After making local source changes, reinstall the CLI with:
-
-```bash
-cargo install --path . --force
-```
-
-After installation, use Forge as a normal CLI:
-
-```bash
-forge units
-forge new stress-check
-forge explain examples/axial_stress.forge
-forge run examples/heat_energy.forge
-forge check examples/dimension_error.forge
-```
-
-Release binaries are now built as CI artifacts for Windows, Linux, and macOS. A full tagged-release flow with checksums and installers is planned. See `docs/release.md`.
-
-## Quick Start
-
-Inspect supported units:
-
-```bash
-forge units
-```
-
-Run a repository example from the Forge repo root:
-
-```bash
-forge run examples/heat_energy.forge
-```
-
-Explain inferred dimensions:
-
-```bash
-forge explain examples/axial_stress.forge
-```
-
-Catch a dimensional mistake:
-
-```bash
-forge check examples/dimension_error.forge
-```
-
-## Create A Worksheet
-
-Create a starter worksheet project:
-
-```bash
-forge new stress-check
-cd stress-check
-forge run main.forge
-forge explain main.forge
-```
-
-Forge creates:
-
-```text
-stress-check/
-  main.forge
-  README.md
-```
-
-## Development Fallback
-
-You can still run everything through Cargo without installing:
-
-```bash
-cargo run -- version
-cargo run -- units
-cargo run -- new stress-check
-cargo run -- explain examples/axial_stress.forge
-cargo run -- run examples/shaft_power_rpm.forge
-cargo run -- check examples/dimension_error.forge
-cargo test
-```
-
-## Example Worksheet
+## A small engineering calculation
 
 ```forge
 # Axial stress
@@ -100,70 +12,68 @@ stress = force / area
 print stress as MPa
 ```
 
-```bash
-forge run examples/axial_stress.forge
-```
+Output: `40 MPa`. The [example worksheets](examples) also cover beam bending, pressure vessels, shaft power, heat energy, fluid flow and Reynolds number.
 
-```text
-40 MPa
-```
+## Quickstart
+
+Install stable Rust and Cargo (Rust 2024 edition support is required), then:
 
 ```bash
-forge explain examples/axial_stress.forge
+git clone https://github.com/willcook415/forge.git
+cd forge
+cargo run --locked -- run examples/axial_stress.forge
+cargo run --locked -- explain examples/axial_stress.forge
+cargo run --locked -- check examples/dimension_error.forge
 ```
 
-```text
-Inferred dimensions:
-  force   [L M T^-2]
-  area    [L^2]
-  stress  [L^-1 M T^-2]
+The last command intentionally fails: adding pressure to length is dimensionally invalid. It prints a source location, operand dimensions and a suggested correction.
 
-Outputs:
-  print stress as MPa  compatible ([L^-1 M T^-2])
-```
-
-## CLI Commands
-
-- `forge run <file>`: validate and execute a Forge script
-- `forge check <file>`: validate a script without executing it
-- `forge explain <file>`: show inferred dimensions and output conversions
-- `forge new <project-name>`: create a starter worksheet project
-- `forge units`: list supported built-in units
-- `forge examples`: list included example scripts and suggested demo commands
-- `forge version`: print the Forge version
-- `forge help`: show CLI help
-
-## Diagnostics
-
-File-backed commands render compiler-style diagnostics with source snippets:
+To install the CLI from this checkout:
 
 ```bash
-forge check examples/dimension_error.forge
+cargo install --locked --path .
+forge new stress-check
+forge run stress-check/main.forge
 ```
+
+## Architecture and decisions
 
 ```text
-error: Cannot add incompatible quantities.
-  --> examples/dimension_error.forge:4:21
-   |
-  4 | badtotal = pressure + length
-   |                     ^
-   |
-   = Left operand dimension: [L^-1 M T^-2]
-   = Right operand dimension: [L]
-   |
-   = help: addition and subtraction require matching dimensions
+source -> lexer -> recursive-descent parser -> AST
+       -> semantic dimension analysis -> interpreter -> output
 ```
 
-## What Changed In v0.2
+- Tokens and AST nodes preserve source locations for diagnostics.
+- A semantic pass resolves variables, infers dimensions and rejects incompatible arithmetic/conversions before execution.
+- Quantities store an `f64` SI magnitude and integer exponents for length, mass, time and temperature. Multiplication/division compose those exponents; output conversion changes the display unit.
+- Parsing, dimensional analysis and execution have separate modules. The implementation has no third-party Rust dependencies.
 
-- Expanded engineering unit registry for mechanical, fluids, heat-transfer, imperial, and rotational worksheets
-- Temperature differences via `K`
-- Angle treated as dimensionless with `rad`, `rev`, and `rpm` support
-- `forge units` for grouped unit discovery
-- `forge explain <file>` for inferred worksheet dimensions
-- Compiler-style source diagnostics for file errors
-- `forge new <project-name>` for starter worksheet projects
-- More realistic engineering examples for stress, bending, pressure vessels, shaft power, and Reynolds number
+See [architecture](docs/architecture.md) for the pipeline and [language specification](SPEC.txt) for the original language foundation.
+
+## Validation
+
+```bash
+cargo fmt --check
+cargo test --locked
+```
+
+Unit tests cover lexing, parsing, dimension inference, conversions, diagnostics and engineering example outputs. [CLI integration tests](tests/cli.rs) exercise valid worksheets, error exit paths, source snippets and project creation, including refusing to overwrite an existing directory.
+
+[GitHub Actions](.github/workflows/ci.yml) runs formatting and tests, then builds Windows, Linux and macOS binaries. These are CI artifacts, not signed installers or a completed tagged-release system. See [release notes](docs/release.md).
+
+Dimensional correctness catches a class of mistakes; it does not establish that a physical model, formula or safety factor is appropriate.
+
+## CLI reference
+
+| Command | Purpose |
+| --- | --- |
+| `forge run <file>` | Validate and execute a worksheet |
+| `forge check <file>` | Validate without executing |
+| `forge explain <file>` | Show inferred dimensions and conversions |
+| `forge new <name>` | Create a starter worksheet directory |
+| `forge units` | List built-in units |
+| `forge examples` | List example scripts |
+| `forge version` / `forge help` | Version and command help |
 
 ## Supported Units
 
@@ -186,22 +96,6 @@ Composed unit expressions are supported, including `mm^2`, `kg/m^3`, `Pa*s`, `N*
 
 Forge uses `[Theta]` for temperature in dimension output. `K` is a temperature-difference unit only; absolute Celsius and Fahrenheit scales are not supported yet because they require offset conversions. Forge treats angle as dimensionless using the common SI engineering convention; `rpm` is angular speed with the standard `2*pi/60` conversion.
 
-## Examples
-
-These scripts live in the repository `examples/` directory. The suggested `forge run examples/...` commands assume you are running from the Forge repository root.
-
-- `examples/axial_stress.forge`: axial stress from force and area
-- `examples/beam_bending.forge`: bending stress from moment, section depth, and inertia
-- `examples/pressure_vessel.forge`: thin-wall hoop stress estimate
-- `examples/power_torque.forge`: torque and rotational rate converted to power
-- `examples/shaft_power_rpm.forge`: shaft power from torque and `rpm`
-- `examples/heat_energy.forge`: heat energy from mass, specific heat, and temperature rise
-- `examples/imperial_pressure.forge`: pressure conversion from `psi`
-- `examples/fluid_volume_flow.forge`: volumetric flow rate using litres
-- `examples/reynolds_number.forge`: dimensionless Reynolds number
-- `examples/dimension_error.forge`: intentionally invalid pressure plus length
-- `examples/invalid_dimensions.forge`: intentionally invalid length plus time
-
 ## Limitations
 
 - Forge tracks length, mass, time, and temperature base dimensions in v0.2.
@@ -213,34 +107,6 @@ These scripts live in the repository `examples/` directory. The suggested `forge
 - The language intentionally has no functions, loops, imports, arrays, packages, or language server yet.
 - Forge checks dimensional compatibility, but it does not verify engineering formulas or safety factors.
 
-## Demo Commands
+## Further reading
 
-Good terminal screenshots from the Forge repository root:
-
-```bash
-forge help
-forge units
-forge examples
-forge new stress-check
-forge explain examples/axial_stress.forge
-forge run examples/heat_energy.forge
-forge run examples/shaft_power_rpm.forge
-forge run examples/imperial_pressure.forge
-forge check examples/dimension_error.forge
-```
-
-## Architecture
-
-Forge executes a script through a compact pipeline:
-
-```text
-source file
-  -> lexer
-  -> parser
-  -> AST
-  -> semantic validation / dimension analysis
-  -> interpreter
-  -> output / error
-```
-
-Detailed design notes: `docs/architecture.md`
+[Architecture](docs/architecture.md) · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Release builds](docs/release.md)
