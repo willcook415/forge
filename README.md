@@ -110,3 +110,7 @@ Forge uses `[Theta]` for temperature in dimension output. `K` is a temperature-d
 ## Further reading
 
 [Architecture](docs/architecture.md) · [Changelog](CHANGELOG.md) · [Roadmap](ROADMAP.md) · [Release builds](docs/release.md)
+
+## License
+
+Forge is released under the [MIT License](LICENSE).
